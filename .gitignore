@@ -1,0 +1,36 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Logs
+logs/
+*.log
+
+# Fabric/Minecraft auto-generated
+.fabric/
+.mixin.out/
+libraries/
+versions/
+crash-reports/
+
+# World data (regenerated on first run)
+Server/world/
+
+# User cache (auto-generated)
+Server/usercache.json
+Server/usernamecache.json
+
+# IDE/OS
+.vscode/
+.idea/
+*.swp
+*.bak
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*.old
+*.tmp

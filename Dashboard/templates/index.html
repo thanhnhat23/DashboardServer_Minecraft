@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft Server Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v={{ ASSET_VERSION }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        /* Spark active indicator */
+        .spark-active {
+            position: relative;
+        }
+        .spark-active::after {
+            content: '⚡';
+            font-size: 0.75rem;
+            position: absolute;
+            top: -8px;
+            right: -12px;
+            color: #fbbf24;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100">
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-[9999] space-y-2 w-80"></div>
+    
+    <div class="min-h-screen flex flex-col">
+        <!-- TOP NAVIGATION -->
+        <nav class="bg-gray-800 border-b border-gray-700 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
+            <div class="flex items-center gap-3">
+                <img src="https://i.pinimg.com/736x/07/fc/eb/07fceb23ddbd4813ce93b8bb1fd668c4.jpg" alt="" class="rounded-full w-10 h-10">
+                <span class="text-3xl font-medium text-white/90 minecraft-font tracking-wide">Neko Nora Dashboard</span>
+            </div>
+            <div class="flex gap-6">
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-400 text-sm">Status:</span>
+                    <span class="font-normal px-2 py-1 rounded bg-red-500/20 text-red-400 minecraft-font" id="nav-status">Offline</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-400 text-sm">Players:</span>
+                    <span class="font-normal px-2 py-1 rounded minecraft-font" id="nav-players">0/20</span>
+                </div>
+            </div>
+        </nav>
+
+        <div class="flex flex-1">
+            <!-- SIDEBAR -->
+            <aside class="w-72 bg-gray-800 border-r border-gray-700 p-6 overflow-y-auto">
+                <div class="mb-6 flex items-center gap-3">
+                    <i class="fa-solid fa-gear"></i>
+                    <h3 class="text-lg font-medium text-white minecraft-font">Controls</h3>
+                </div>
+
+                <!-- Server Management -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-normal text-gray-300 mb-3 uppercase minecraft-font">Server Management</h4>
+                    <button id="btn-start" class="w-full py-2 px-4 rounded font-normal transition flex items-center justify-center gap-2 bg-green-600 hover:bg-green-500 text-white disabled:bg-gray-600 disabled:cursor-not-allowed minecraft-font">
+                        <i class="fas fa-play"></i> Start Server
+                    </button>
+                    <button id="btn-stop" class="w-full py-2 px-4 rounded font-normal transition flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white disabled:bg-gray-600 disabled:cursor-not-allowed mt-2 minecraft-font" disabled>
+                        <i class="fas fa-stop"></i> Stop Server
+                    </button>
+                    <button id="btn-restart" class="w-full py-2 px-4 rounded font-normal transition flex items-center justify-center gap-2 bg-blue-400 hover:bg-blue-500 text-white disabled:bg-gray-600 disabled:cursor-not-allowed mt-2 minecraft-font" disabled>
+                        <i class="fas fa-sync"></i> Restart
+                    </button>
+                </div>
+
+                <div class="border-t border-gray-700 my-6"></div>
+
+                <!-- Quick Commands -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-semibold text-gray-300 mb-3 uppercase">Quick Commands</h4>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button class="quick-cmd bg-zinc-600 hover:bg-zinc-500 text-white py-2 px-3 rounded text-xs transition flex flex-col items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed minecraft-font" data-cmd="list" disabled>
+                            <i class="fas fa-users"></i> <span>List</span>
+                        </button>
+                        <button class="quick-cmd bg-blue-500 hover:bg-blue-400 text-white py-2 px-3 rounded text-xs transition flex flex-col items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed minecraft-font" data-cmd="save-all" disabled>
+                            <i class="fas fa-floppy-disk"></i> <span>Save</span>
+                        </button>
+                        <button class="quick-cmd bg-zinc-600 hover:bg-zinc-500 text-white py-2 px-3 rounded text-xs transition flex flex-col items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed minecraft-font" data-cmd="reload" disabled>
+                            <i class="fas fa-repeat"></i> <span>Reload</span>
+                        </button>
+                        <button class="quick-cmd bg-zinc-600 hover:bg-zinc-500 text-white py-2 px-3 rounded text-xs transition flex flex-col items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed minecraft-font" data-cmd="say Maintenance in 5 mins" disabled>
+                            <i class="fas fa-comment"></i> <span>Say</span>
+                        </button>
+                        <button class="quick-cmd bg-green-500 hover:bg-green-400 text-white py-2 px-3 rounded text-xs transition flex flex-col items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed minecraft-font" data-cmd="difficulty peaceful" disabled>
+                            <i class="fas fa-dove"></i> <span>Peace</span>
+                        </button>
+                        <button class="quick-cmd bg-red-500 hover:bg-red-400 text-white py-2 px-3 rounded text-xs transition flex flex-col items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed minecraft-font" data-cmd="difficulty hard" disabled>
+                            <i class="fas fa-skull"></i> <span>Hard</span>
+                        </button>
+                        <button class="quick-cmd bg-yellow-500 hover:bg-yellow-400 text-black py-2 px-3 rounded text-xs transition flex flex-col items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed minecraft-font" data-cmd="weather clear" disabled>
+                            <i class="fa-solid fa-cloud-sun text-white"></i> <span>Clear</span>
+                        </button>
+                        <button class="quick-cmd bg-blue-800 hover:bg-blue-700 text-white py-2 px-3 rounded text-xs transition flex flex-col items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed minecraft-font" data-cmd="weather rain" disabled>
+                            <i class="fas fa-cloud-rain"></i> <span>Rain</span>
+                        </button>
+                        <button class="quick-cmd bg-amber-400/80 hover:bg-amber-300/80 text-black py-2 px-3 rounded text-xs transition flex flex-col items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed minecraft-font" data-cmd="time set day" disabled>
+                            <i class="fas fa-sun text-white"></i> <span>Day</span>
+                        </button>
+                        <button class="quick-cmd bg-black/50 hover:bg-black/80 text-white py-2 px-3 rounded text-xs transition flex flex-col items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed minecraft-font" data-cmd="time set night" disabled>
+                            <i class="fas fa-moon"></i> <span>Night</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-700 my-6"></div>
+
+                <!-- Status Panel -->
+                <div class="bg-gray-700/50 rounded p-4">
+                    <h4 class="text-sm font-normal text-gray-300 mb-3 uppercase minecraft-font">Status</h4>
+                    <div class="flex justify-between py-2 text-sm border-b border-gray-600">
+                        <span>Server:</span>
+                        <span id="sidebar-status" class="font-normal text-red-400 minecraft-font">Offline</span>
+                    </div>
+                    <div class="flex justify-between py-2 text-sm border-b border-gray-600">
+                        <span>Uptime:</span>
+                        <span id="sidebar-uptime" class="font-normal minecraft-font">0h 0m 0s</span>
+                    </div>
+                    <div class="flex justify-between py-2 text-sm">
+                        <span>TPS:</span>
+                        <span id="sidebar-tps" class="font-normal minecraft-font">20.0</span>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-700 my-4"></div>
+
+                <!-- Banned Players Panel -->
+                <div class="bg-gray-700/50 rounded p-4 mb-4">
+                    <h4 class="text-sm font-normal text-gray-300 mb-3 uppercase flex items-center gap-2 minecraft-font">
+                        <i class="fas fa-user-slash"></i> Banned Players (<span id="banned-count">0</span>)
+                    </h4>
+                    <div id="banned-players-list" class="space-y-2 max-h-40 overflow-y-auto">
+                        <div class="text-xs text-gray-400 text-center py-2">No banned players</div>
+                    </div>
+                </div>
+
+                <!-- Banned IPs Panel -->
+                <div class="bg-gray-700/50 rounded p-4">
+                    <h4 class="text-sm font-normal text-gray-300 mb-3 uppercase flex items-center gap-2 minecraft-font">
+                        <i class="fas fa-ban"></i> Banned IPs (<span id="banned-ips-count">0</span>)
+                    </h4>
+                    <div id="banned-ips-list" class="space-y-2 max-h-40 overflow-y-auto">
+                        <div class="text-xs text-gray-400 text-center py-2">No banned IPs</div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- MAIN CONTENT AREA -->
+            <main class="flex-1 p-8 overflow-y-auto">
+                <!-- METRICS SECTION -->
+                <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <!-- CPU Card -->
+                    <div class="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-gray-600 transition">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="flex items-center gap-2 text-lg font-normal text-white minecraft-font">
+                                <i class="fas fa-microchip"></i>
+                                <span>CPU Usage</span>
+                            </div>
+                            <span class="text-2xl font-normal minecraft-font text-blue-400" id="cpu-value">0%</span>
+                        </div>
+                        <div class="w-full bg-gray-700 rounded h-2 overflow-hidden mb-2">
+                            <div class="h-full bg-blue-500 transition-all duration-300" id="cpu-bar"></div>
+                        </div>
+                        <div class="text-xs text-gray-400 mb-2">Peak: <span id="cpu-peak">0%</span></div>
+                        <div class="h-12">
+                            <canvas id="cpu-sparkline" class="w-full h-full"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- RAM Card -->
+                    <div class="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-gray-600 transition">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="flex items-center gap-2 text-lg font-normal text-white minecraft-font">
+                                <i class="fas fa-memory"></i>
+                                <span>RAM Usage</span>
+                            </div>
+                            <span class="text-2xl font-normal minecraft-font text-purple-400" id="mem-value">0%</span>
+                        </div>
+                        <div class="w-full bg-gray-700 rounded h-2 overflow-hidden mb-2">
+                            <div class="h-full bg-purple-500 transition-all duration-300" id="mem-bar"></div>
+                        </div>
+                        <div class="text-xs text-gray-400 mb-2">Memory: <span id="mem-mb-value">0 MB</span></div>
+                        <div class="h-12">
+                            <canvas id="mem-sparkline" class="w-full h-full"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- TPS Card -->
+                    <div class="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-gray-600 transition">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="flex items-center gap-2 text-lg font-normal text-white minecraft-font">
+                                <i class="fas fa-tachometer-alt"></i>
+                                <span>Server TPS</span>
+                            </div>
+                            <span class="text-2xl font-normal minecraft-font text-green-400" id="tps-value">20.0</span>
+                        </div>
+                        <div class="flex items-center gap-2 mb-2">
+                            <div class="inline-block w-3 h-3 rounded-full bg-green-500" id="tps-indicator"></div>
+                            <span id="tps-status">Optimal</span>
+                        </div>
+                        <div class="text-xs text-gray-400 mb-2">Ping: <span id="ping-value" class="text-blue-400">N/A</span></div>
+                        <div class="h-8 flex gap-2">
+                            <div class="flex-1 relative">
+                                <canvas id="tps-sparkline" class="w-full h-full"></canvas>
+                                <div class="absolute bottom-2 left-0 text-[9px] text-green-400 opacity-60">TPS</div>
+                            </div>
+                            <div class="flex-1 relative">
+                                <canvas id="ping-sparkline" class="w-full h-full"></canvas>
+                                <div class="absolute bottom-2 left-0 text-[9px] text-blue-400 opacity-60">Ping</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Disk Usage Card -->
+                    <div class="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-gray-600 transition">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="flex items-center gap-2 text-lg font-normal text-white minecraft-font">
+                                <i class="fas fa-hard-drive"></i>
+                                <span>Disk Usage</span>
+                            </div>
+                            <span class="text-2xl font-normal minecraft-font text-purple-400" id="disk-value">0%</span>
+                        </div>
+                        <div class="w-full bg-gray-700 rounded h-2 overflow-hidden mb-2">
+                            <div class="h-full bg-purple-500 transition-all duration-300" id="disk-bar"></div>
+                        </div>
+                        <div class="text-xs text-gray-400"><span id="disk-used">0</span> GB / <span id="disk-total">0</span> GB</div>
+                    </div>
+                </section>
+
+                <!-- OLD PLAYERS CARD - MOVE TO SECTION -->
+                <section class="mb-8">
+                    <!-- Players Card -->
+                    <div class="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-gray-600 transition">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="flex items-center gap-2 text-lg font-normal text-white minecraft-font">
+                                <i class="fas fa-user-group"></i>
+                                <span>Players</span>
+                            </div>
+                            <span class="text-2xl font-bold text-yellow-400" id="player-count">0<span>/20</span></span>
+                        </div>
+                        <div class="relative w-24 h-24 flex items-center justify-center mx-auto">
+                            <svg viewBox="0 0 100 100" class="w-full h-full transform -rotate-90">
+                                <circle cx="50" cy="50" r="45" class="fill-none stroke-gray-700 stroke-[2]"></circle>
+                                <circle cx="50" cy="50" r="45" class="fill-none stroke-yellow-500 stroke-[2] transition-all duration-300" id="player-circle" style="stroke-dasharray: 282; stroke-dashoffset: 282;"></circle>
+                            </svg>
+                            <span class="absolute text-lg font-bold text-yellow-400" id="circle-percent">0%</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- CHART SECTION -->
+                <section class="bg-gray-800 rounded-lg p-6 border border-gray-700 mb-8">
+                    <div class="mb-4">
+                        <h3 class="text-lg font-normal minecraft-font text-white flex items-center gap-2">
+                            <i class="fas fa-chart-line"></i> Performance Realtime
+                        </h3>
+                    </div>
+                    <div class="relative h-80">
+                        <canvas id="statsChart"></canvas>
+                    </div>
+                </section>
+
+                <!-- BOTTOM PANELS -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
+                    <!-- PLAYERS PANEL -->
+                    <section class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col overflow-hidden lg:col-span-1">
+                        <div class="bg-gray-700/50 px-6 py-4 border-b border-gray-700 flex justify-between items-center">
+                            <h3 class="font-normal minecraft-font text-white flex items-center gap-2">
+                                <i class="fas fa-users"></i> Online Players (<span id="online-count">0</span>)
+                            </h3>
+                        </div>
+                        <div class="p-6 space-y-3" id="players-list">
+                            <div class="text-center py-12 text-gray-400">
+                                <i class="fas fa-user-slash text-4xl mb-2 block"></i>
+                                <p>No players online</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- CONSOLE PANEL -->
+                    <section class="bg-gray-800 rounded-lg border border-gray-700 flex flex-col overflow-hidden lg:col-span-2">
+                        <div class="bg-gray-700/50 px-8 py-4 border-b border-gray-700 flex justify-between items-center">
+                            <h3 class="font-normal minecraft-font text-white flex items-center gap-2">
+                                <i class="fas fa-terminal"></i> Console
+                            </h3>
+                            <button id="btn-clear-log" class="text-gray-400 hover:text-white transition">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                        <div class="h-96 bg-black p-4 font-mono text-xs overflow-y-auto space-y-1 hide-scrollbar" 
+                            id="console-log">
+                            <div class="text-gray-300">[Dashboard] Server dashboard ready</div>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- COMMAND INPUT -->
+                <section class="bg-gray-800 rounded-lg border border-gray-700 p-6">
+                    <div class="bg-gray-700/50 px-6 py-4 border-b border-gray-700 flex justify-between items-center mb-4 -m-6 -mb-4 rounded-t-lg">
+                        <h3 class="font-normal minecraft-font text-white flex items-center gap-2">
+                            <i class="fas fa-keyboard"></i> Execute Command
+                        </h3>
+                    </div>
+                    <div class="flex gap-2 mt-4">
+                        <input type="text" id="cmd-input" placeholder="Enter command (e.g., tp @s ~ ~10 ~)" autocomplete="off" class="flex-1 bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        <button id="btn-send" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded font-medium transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                            <i class="fas fa-paper-plane"></i> Send
+                        </button>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/charts.js') }}?v={{ ASSET_VERSION }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}?v={{ ASSET_VERSION }}"></script>
+</body>
+</html>
